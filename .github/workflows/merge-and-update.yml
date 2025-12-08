@@ -1,0 +1,65 @@
+name: Parallel fetch + single commit
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        worker: [1,2,3,4,5,6,7,8]   # 8 parallel scrapers
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run scraper part
+        run: node index.js
+        env:
+          BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          BATCH_NUM: ${{ matrix.worker }}
+
+      - name: Upload scraper output
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraped-${{ matrix.worker }}
+          path: data/cs2_prices/cs2_items_${{ matrix.worker }}.json
+
+  merge-and-commit:
+    needs: scrape
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download all scraped artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: scraped_parts
+          pattern: scraped-*
+
+      - name: Merge scraped data
+        run: |
+          mkdir -p data
+          node merge-scraped-data.js scraped_parts > data/latest.json
+          rm -f data/part-*.json || true
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/latest.json
+          git commit -m "Update data" --amend || echo "No previous commit"
+          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }} --force
