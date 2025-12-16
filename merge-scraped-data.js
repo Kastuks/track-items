@@ -1,47 +1,55 @@
 #!/usr/bin/env node
+import fs from "fs";
+import path from "path";
 
-const fs = require("fs");
-const path = require("path");
+/**
+ * Usage:
+ *   node merge-scraped-data.js scraped_parts
+ *
+ * Expected layout:
+ * scraped_parts/
+ *   scraped-1/part-1.json
+ *   scraped-2/part-2.json
+ *   ...
+ */
 
-const inputDir = process.argv[2];
-if (!inputDir) {
-  console.error("Usage: node merge-scraped-data.js <directory>");
+const root = process.argv[2];
+if (!root) {
+  console.error("Usage: node merge-scraped-data.js <artifactDir>");
   process.exit(1);
 }
 
-function findJsonFiles(dir) {
-  const output = [];
-
-  for (const file of fs.readdirSync(dir)) {
-    const fullPath = path.join(dir, file);
-    const stat = fs.statSync(fullPath);
-
-    if (stat.isDirectory()) {
-      output.push(...findJsonFiles(fullPath));
-    } else if (file.endsWith(".json")) {
-      output.push(fullPath);
-    }
-  }
-
-  return output;
+function isScrapedArtifact(name) {
+  return name.startsWith("scraped-");
 }
-
-const jsonFiles = findJsonFiles(inputDir);
 
 let merged = [];
 
-for (const filePath of jsonFiles) {
-  try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    const data = JSON.parse(raw);
+const artifactDirs = fs.readdirSync(root, { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => d.name)
+  .filter(isScrapedArtifact);
 
-    if (Array.isArray(data)) {
-      merged.push(...data);
-    } else {
-      merged.push(data);
+for (const dir of artifactDirs) {
+  const fullDir = path.join(root, dir);
+  const files = fs.readdirSync(fullDir);
+
+  for (const file of files) {
+    if (!file.startsWith("part-") || !file.endsWith(".json")) continue;
+
+    const filePath = path.join(fullDir, file);
+
+    try {
+      const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+
+      if (Array.isArray(data)) {
+        merged.push(...data);
+      } else {
+        merged.push(data);
+      }
+    } catch (err) {
+      console.error(`Failed to parse ${filePath}`, err);
     }
-  } catch (err) {
-    console.error(`Failed to parse ${filePath}:`, err);
   }
 }
 

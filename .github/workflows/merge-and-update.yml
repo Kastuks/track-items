@@ -81,6 +81,11 @@ jobs:
             echo "Could not find start_from.json file inside artifact zip; proceeding with defaults"
           fi
 
+      - name: Debug start_from before scrape
+        run: |
+          echo "Using start_from_${{ matrix.worker }}:"
+          cat data/start_from/start_from_${{ matrix.worker }} || echo "MISSING"
+
       - name: Run scraper for part ${{ matrix.worker }}
         env:
           BATCH_NUM: ${{ matrix.worker }}
@@ -146,5 +151,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add data/latest.json
-          git commit -m "Update data" --amend || echo "No previous commit"
-          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }} --force
+          git commit -m "Update data" || echo "No previous commit"
+          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
