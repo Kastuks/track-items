@@ -1,0 +1,150 @@
+name: Parallel fetch + single commit
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # every hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+
+env:
+  REPO: ${{ github.repository }}
+  API_BASE: https://api.github.com
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        worker: [1,2,3,4,5,6,7,8]   # 8 parallel scrapers
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get latest start_from artifact (if any)
+        id: get_start
+        run: |
+          set -e
+          WORKER=${{ matrix.worker }}
+          TOKEN=${{ secrets.BOT_GITHUB_TOKEN }}
+          OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+
+          echo "Looking up latest artifact for start_from_${WORKER}.json..."
+
+          # List artifacts (paged) and find the newest artifact whose name matches start_from_<worker>.json
+          # Query the repository artifacts
+          artifacts_json=$(curl -s -H "Authorization: Bearer $TOKEN" \
+            "$API_BASE/repos/$OWNER/$REPO/actions/artifacts?per_page=100")
+
+          # Use jq to find artifact id by name (take the most recent by creation)
+          ART_ID=$(echo "$artifacts_json" | jq -r --arg NAME "start_from_${WORKER}" \
+            '.artifacts | map(select(.name == $NAME)) | sort_by(.created_at) | last | .id')
+
+          if [ "$ART_ID" = "null" ] || [ -z "$ART_ID" ]; then
+            echo "no_previous_artifact=true" >> $GITHUB_OUTPUT
+            echo "No prior start_from artifact found for worker $WORKER"
+            exit 0
+          fi
+
+          echo "Found artifact id: $ART_ID for start_from_${WORKER}.json"
+          ZIP_URL="$API_BASE/repos/$OWNER/$REPO/actions/artifacts/$ART_ID/zip"
+          # Download artifact zip
+          curl -sL -H "Authorization: Bearer $TOKEN" -o /tmp/start_artifact.zip "$ZIP_URL"
+          mkdir -p data/start_from
+          unzip -o /tmp/start_artifact.zip -d /tmp/start_artifact || true
+
+          # The artifact may contain the single file start_from_X.json in the root or in a folder
+          # Try to find it
+          FOUND_FILE=$(find /tmp/start_artifact -type f -name "start_from_${WORKER}.json" -print -quit || true)
+          if [ -z "$FOUND_FILE" ]; then
+            # fallback: any file named start_from*
+            FOUND_FILE=$(find /tmp/start_artifact -type f -name "start_from_*.json" -print -quit || true)
+          fi
+
+          if [ -n "$FOUND_FILE" ]; then
+            echo "Copying $FOUND_FILE -> data/start_from/start_from_${WORKER}.json"
+            mkdir -p data/start_from
+            cp "$FOUND_FILE" "data/start_from/start_from_${WORKER}.json"
+            echo "no_previous_artifact=false" >> $GITHUB_OUTPUT
+          else
+            echo "no_previous_artifact=true" >> $GITHUB_OUTPUT
+            echo "Could not find start_from.json file inside artifact zip; proceeding with defaults"
+          fi
+
+      - name: Run scraper for part ${{ matrix.worker }}
+        env:
+          BATCH_NUM: ${{ matrix.worker }}
+          BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          # Ensure the scraper writes the worker-specific file to data/start_from/start_from_<worker>.json
+          mkdir -p data/start_from
+          node index.js
+          # Make sure index.js saved cs2_items_${BATCH_NUM}.json (or adapt)
+          # Normalize produced file name to part-<worker>.json for artifact upload
+          if [ -f "cs2_items_${BATCH_NUM}.json" ]; then
+            mv cs2_items_${BATCH_NUM}.json part-${BATCH_NUM}.json
+          elif [ -f "data/cs2_prices/cs2_items_${BATCH_NUM}.json" ]; then
+            mv data/cs2_prices/cs2_items_${BATCH_NUM}.json part-${BATCH_NUM}.json
+          else
+            echo "Expected cs2_items_${BATCH_NUM}.json not present; ensure index.js writes it"
+            ls -la
+            exit 1
+          fi
+
+          # Make sure the updated start_from file exists
+          if [ ! -f "data/start_from/start_from_${BATCH_NUM}.json" ]; then
+            echo "Warning: scraper did not produce data/start_from/start_from_${BATCH_NUM}.json; creating fallback"
+            mkdir -p data/start_from
+            echo "0" > data/start_from/start_from_${BATCH_NUM}.json
+          fi
+
+      - name: Upload scraped output + updated start_from
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraped-${{ matrix.worker }}
+          path: |
+            part-${{ matrix.worker }}.json
+
+      - name: Upload start_from
+        uses: actions/upload-artifact@v4
+        with:
+          name: start_from_${{ matrix.worker }}
+          path: data/start_from/start_from_${{ matrix.worker }}.json
+
+  merge-and-commit:
+    needs: scrape
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download all scraped artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: scraped_parts
+          pattern: scraped-*
+
+      - name: Merge scraped data
+        run: |
+          mkdir -p data
+          node merge-scraped-data.js scraped_parts > data/latest.json
+          rm -f data/part-*.json || true
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/latest.json
+          git commit -m "Update data" --amend || echo "No previous commit"
+          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }} --force

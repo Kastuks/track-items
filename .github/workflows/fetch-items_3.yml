@@ -1,0 +1,55 @@
+name: Fetch CS2 Items_3
+
+on:
+  # schedule:
+  #   - cron: "14 */1 * * *" # every hour on 14 minute
+  workflow_dispatch:       # allow manual run via GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    name: Fetch Items Batch 3
+    runs-on: ubuntu-latest
+    
+    concurrency:
+      group: fetch-items-3
+      cancel-in-progress: false
+    
+    steps:
+      - name: Sleep for 30 seconds
+        run: sleep 30s
+        shell: bash
+
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Pull latest from master before executing price fetch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git pull origin master
+
+      - name: Run fetcher
+        run: node index.js
+        env:
+          BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          BATCH_NUM: 3
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git pull https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+          git add -A
+          git diff --cached --quiet || git commit -m "Update CS2 item prices [CI run]" --amend
+          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }} --force
