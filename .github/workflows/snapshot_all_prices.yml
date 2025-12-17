@@ -2,7 +2,7 @@ name: Snapshot prices
 
 on:
   schedule:
-    - cron: "0 0 * * 3"    # at 00:00 on Wednesdays
+    - cron: "40 0 * * 3"    # at 00:40 on Wednesdays
   workflow_dispatch:       # allow manual run via GitHub UI
 
 permissions:
@@ -32,5 +32,5 @@ jobs:
           git config user.email "actions@github.com"
           git pull https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
           git add -A
-          git diff --cached --quiet || git commit -m "Snapshot prices [CI run]" --amend
-          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }} --force
+          git diff --cached --quiet || git commit -m "Snapshot prices [CI run]"
+          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
