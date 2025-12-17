@@ -134,17 +134,13 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Download all scraped artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: scraped_parts
-          pattern: scraped-*
 
-      - name: Merge scraped data
+      - name: Merge shards
         run: |
-          mkdir -p data
-          node merge-scraped-data.js scraped_parts > data/latest.json
-          rm -f data/part-*.json || true
+          node merge-scraped-data.js scraped_parts
 
       - name: Commit & push
         run: |
