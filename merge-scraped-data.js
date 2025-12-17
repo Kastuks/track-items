@@ -10,7 +10,7 @@ let latestMap = {};
 if (fs.existsSync(outputPath)) {
   try {
     const existing = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    console.log('existing: ', existing);
+    // console.log('existing: ', existing);
     if (Array.isArray(existing)) {
       for (const item of existing) {
         if (item && item.id != null) {
@@ -42,6 +42,9 @@ for (const dir of fs.readdirSync(artifactsDir)) {
       console.warn(`⚠️ Skipping invalid JSON: ${shardPath}`);
       continue;
     }
+
+    console.log('shard: length=', shard.length);
+    console.log('shard: ', shard);
 
     // ✅ Normalize to array
     const items = Array.isArray(shard)
