@@ -10,7 +10,7 @@ let latestMap = {};
 if (fs.existsSync(outputPath)) {
   try {
     const existing = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-    // console.log('existing: ', existing);
+    console.log('existing length: ', existing.length);
     if (Array.isArray(existing)) {
       for (const item of existing) {
         if (item && item.item_nameid != null) {

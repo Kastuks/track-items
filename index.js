@@ -199,7 +199,6 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
       }
 
       console.log(`Fetched ${currentItemName} ${currentBatchStart}/${maxAmount}`);
-      await fs.writeFile(savePath, JSON.stringify(Object.values(itemsMap), null, 2));
       await sleep(DELAY_MS);
     } catch (err) {
       console.error(`Error fetching items at start=${start}: ${err.message}`);
@@ -207,6 +206,7 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
     }
   }
   
+  await fs.writeFile(savePath, JSON.stringify(Object.values(itemsMap), null, 2));
   return Object.values(itemsMap).map(item => item.hash_name);
 }
 
