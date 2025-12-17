@@ -13,8 +13,8 @@ if (fs.existsSync(outputPath)) {
     // console.log('existing: ', existing);
     if (Array.isArray(existing)) {
       for (const item of existing) {
-        if (item && item.id != null) {
-          latestMap[item.id] = item;
+        if (item && item.item_nameid != null) {
+          latestMap[item.item_nameid] = item;
         }
       }
     }
@@ -54,8 +54,8 @@ for (const dir of fs.readdirSync(artifactsDir)) {
         : [];
 
     for (const item of items) {
-      if (item && item.id != null) {
-        latestMap[item.id] = item;
+      if (item && item.item_nameid != null) {
+        latestMap[item.item_nameid] = item;
       }
     }
   }
