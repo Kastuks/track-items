@@ -44,7 +44,7 @@ for (const dir of fs.readdirSync(artifactsDir)) {
     }
 
     console.log('shard: length=', shard.length);
-    console.log('shard: ', shard);
+    console.log(`shard info: fullDir: ${fullDir}, file: ${file}`);
 
     // ✅ Normalize to array
     const items = Array.isArray(shard)
@@ -61,10 +61,12 @@ for (const dir of fs.readdirSync(artifactsDir)) {
   }
 }
 
-console.log('latestMap: ', latestMap);
+console.log('latestMap len: ', latestMap.length);
 
 if (Object.keys(latestMap).length < 100) {
   throw new Error("Refusing to write empty latest.json — merge failed");
+} else {
+  throw new Error('just refuse to merge')
 }
 
 // Write final array
