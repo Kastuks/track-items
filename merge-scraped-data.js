@@ -74,8 +74,6 @@ console.log('latestMap len: ', Object.values(latestMap).length);
 
 if (Object.keys(latestMap).length < 100) {
   throw new Error("Refusing to write empty latest.json — merge failed");
-} else {
-  throw new Error('just refuse to merge')
 }
 
 // Write final array
