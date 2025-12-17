@@ -61,7 +61,7 @@ for (const dir of fs.readdirSync(artifactsDir)) {
   }
 }
 
-console.log('latestMap len: ', latestMap.length);
+console.log('latestMap len: ', Object.values(latestMap).length);
 
 if (Object.keys(latestMap).length < 100) {
   throw new Error("Refusing to write empty latest.json — merge failed");

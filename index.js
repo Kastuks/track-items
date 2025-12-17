@@ -207,7 +207,7 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
     }
   }
   
-  return itemsMap;
+  return Object.values(itemsMap).map(item => item.hash_name);
 }
 
 async function fetchPriceInfo(itemName) {
@@ -263,6 +263,7 @@ async function main() {
   getUsdToEurConversionRate();
   const items = await fetchAllItemPrices();
 
+  console.log('All items: ', items);
   console.log(`Done! Saved ${items.length} items to ${outputPath}`);
 }
 
