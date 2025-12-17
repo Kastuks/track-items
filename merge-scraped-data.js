@@ -2,67 +2,71 @@
 import fs from "fs";
 import path from "path";
 
-/**
- * Merges append-only shards into latest.json.
- * Outputs a JSON array of all unique items, newest overwrite.
- */
+const artifactsDir = process.argv[2] || "scraped_parts";
+const outputPath = "data/latest.json";
 
-const artifactsDir = process.argv[2];
-if (!artifactsDir) {
-  console.error("Usage: node merge-scraped-data.js <artifactDir>");
-  process.exit(1);
-}
-
-// Load existing latest.json (array) into a map
+// Load existing latest.json
 let latestMap = {};
-if (fs.existsSync("data/latest.json")) {
+if (fs.existsSync(outputPath)) {
   try {
-    const existing = JSON.parse(fs.readFileSync("data/latest.json", "utf8"));
+    const existing = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    console.log('existing: ', existing);
     if (Array.isArray(existing)) {
-      existing.forEach(item => {
-        latestMap[item.id] = item;
-      });
+      for (const item of existing) {
+        if (item && item.id != null) {
+          latestMap[item.id] = item;
+        }
+      }
     }
-  } catch (e) {
-    console.warn("Unable to read existing latest.json — ignoring", e);
+  } catch {
+    console.warn("⚠️ Could not parse existing latest.json, starting fresh");
   }
 }
 
-// Enumerate shard artifacts (`scraped-X` folders)
-const artifactDirs = fs
-  .readdirSync(artifactsDir, { withFileTypes: true })
-  .filter(d => d.isDirectory() && d.name.startsWith("scraped-"))
-  .map(d => d.name);
+// Walk scraped-* artifacts
+for (const dir of fs.readdirSync(artifactsDir)) {
+  if (!dir.startsWith("scraped-")) continue;
 
-for (const dir of artifactDirs) {
   const fullDir = path.join(artifactsDir, dir);
+  if (!fs.statSync(fullDir).isDirectory()) continue;
 
-  // Find the part file inside the shard artifact
-  const files = fs.readdirSync(fullDir);
-  const partFile = files.find(f => f.startsWith("part-") && f.endsWith(".json"));
-  if (!partFile) continue;
+  for (const file of fs.readdirSync(fullDir)) {
+    if (!file.endsWith(".json")) continue;
 
-  const shardPath = path.join(fullDir, partFile);
-  let shardData;
-  try {
-    shardData = JSON.parse(fs.readFileSync(shardPath, "utf8"));
-  } catch (e) {
-    console.error(`Failed to parse shard: ${shardPath}`, e);
-    continue;
-  }
+    const shardPath = path.join(fullDir, file);
+    let shard;
 
-  // Merge: overwrite existing ID if shard has a new value
-  if (Array.isArray(shardData)) {
-    shardData.forEach(item => {
-      latestMap[item.id] = item;
-    });
+    try {
+      shard = JSON.parse(fs.readFileSync(shardPath, "utf8"));
+    } catch {
+      console.warn(`⚠️ Skipping invalid JSON: ${shardPath}`);
+      continue;
+    }
+
+    // ✅ Normalize to array
+    const items = Array.isArray(shard)
+      ? shard
+      : shard && typeof shard === "object"
+        ? [shard]
+        : [];
+
+    for (const item of items) {
+      if (item && item.id != null) {
+        latestMap[item.id] = item;
+      }
+    }
   }
 }
 
-// Convert back to array and write
-const mergedArray = Object.values(latestMap);
+console.log('latestMap: ', latestMap);
+
+if (Object.keys(latestMap).length < 100) {
+  throw new Error("Refusing to write empty latest.json — merge failed");
+}
+
+// Write final array
 fs.mkdirSync("data", { recursive: true });
 fs.writeFileSync(
-  "data/latest.json",
-  JSON.stringify(mergedArray, null, 2)
+  outputPath,
+  JSON.stringify(Object.values(latestMap), null, 2)
 );
