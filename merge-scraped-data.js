@@ -10,6 +10,9 @@ let latestMap = {};
 if (fs.existsSync(outputPath)) {
   try {
     const existing = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+
+    const duplicates = existing.map(item => item.item_nameid).filter((item, index) => arrayBuffer.indexOf(item) !== index);
+    console.log('dupes: ', duplicates);
     console.log('existing length: ', existing.length);
     if (Array.isArray(existing)) {
       for (const item of existing) {
