@@ -83,8 +83,8 @@ jobs:
 
       - name: Debug start_from before scrape
         run: |
-          echo "Using start_from_${{ matrix.worker }}:"
-          cat data/start_from/start_from_${{ matrix.worker }} || echo "MISSING"
+          echo "Using start_from_${{ matrix.worker }}.json:"
+          cat data/start_from/start_from_${{ matrix.worker }}.json || echo "MISSING"
 
       - name: Run scraper for part ${{ matrix.worker }}
         env:

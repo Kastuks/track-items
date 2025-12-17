@@ -3,54 +3,43 @@ import fs from "fs";
 import path from "path";
 
 /**
- * Usage:
- *   node merge-scraped-data.js scraped_parts
- *
- * Expected layout:
- * scraped_parts/
- *   scraped-1/part-1.json
- *   scraped-2/part-2.json
- *   ...
+ * Merges append-only shards into latest.json.
+ * New items overwrite old ones by item id.
  */
 
-const root = process.argv[2];
-if (!root) {
-  console.error("Usage: node merge-scraped-data.js <artifactDir>");
-  process.exit(1);
+const artifactsDir = process.argv[2] || "scraped_parts";
+const outputFile = "data/latest.json";
+
+// Load existing latest.json (if any)
+let latest = {};
+if (fs.existsSync(outputFile)) {
+  const old = JSON.parse(fs.readFileSync(outputFile, "utf8"));
+  for (const item of old) {
+    latest[item.id] = item;
+  }
 }
 
-function isScrapedArtifact(name) {
-  return name.startsWith("scraped-");
-}
+// Merge new shards
+for (const dir of fs.readdirSync(artifactsDir)) {
+  if (!dir.startsWith("scraped-")) continue;
 
-let merged = [];
+  const shardDir = path.join(artifactsDir, dir);
+  for (const file of fs.readdirSync(shardDir)) {
+    if (!file.startsWith("part-")) continue;
 
-const artifactDirs = fs.readdirSync(root, { withFileTypes: true })
-  .filter(d => d.isDirectory())
-  .map(d => d.name)
-  .filter(isScrapedArtifact);
+    const shard = JSON.parse(
+      fs.readFileSync(path.join(shardDir, file), "utf8")
+    );
 
-for (const dir of artifactDirs) {
-  const fullDir = path.join(root, dir);
-  const files = fs.readdirSync(fullDir);
-
-  for (const file of files) {
-    if (!file.startsWith("part-") || !file.endsWith(".json")) continue;
-
-    const filePath = path.join(fullDir, file);
-
-    try {
-      const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
-
-      if (Array.isArray(data)) {
-        merged.push(...data);
-      } else {
-        merged.push(data);
-      }
-    } catch (err) {
-      console.error(`Failed to parse ${filePath}`, err);
+    for (const item of shard) {
+      latest[item.id] = item; // overwrite by id
     }
   }
 }
 
-process.stdout.write(JSON.stringify(merged, null, 2));
+// Write canonical result
+fs.mkdirSync("data", { recursive: true });
+fs.writeFileSync(
+  outputFile,
+  JSON.stringify(Object.values(latest), null, 2)
+);
