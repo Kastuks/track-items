@@ -51,6 +51,19 @@ jobs:
           git add -A
           git diff --cached --quiet || git commit -m "Update CS2 item prices [CI run]"
 
+      - name: Fetch and rebase remote branch (if exists)
+        run: |
+          echo "Configuring origin to use token for fetch/push"
+          git remote set-url origin "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          echo "Fetching remote branch ${GITHUB_REF_NAME:-${{ github.ref_name }}}"
+          git fetch origin "${{ github.ref_name }}" || true
+          if git rev-parse --verify "origin/${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "Rebasing local commits onto origin/${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}" || { echo "Rebase failed; aborting. Resolve conflicts manually or re-run workflow."; git rebase --abort || true; exit 1; }
+          else
+            echo "Remote branch origin/${{ github.ref_name }} not found; skipping rebase"
+          fi
+
       - name: Squash commits and push once (or push as-is when COUNT=0)
         env:
           COUNT: ${{ github.event.inputs.commit_count }}
