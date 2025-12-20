@@ -7,10 +7,10 @@ import { existsSync } from 'fs';
 
 const item_info_link = "https://raw.githubusercontent.com/Kastuks/market-information/refs/heads/main/data/cs2_items.json";
 const local_skins_to_name_id_path = "backup/cs2_skins_to_name_id.json";
-const runWorkflowFor = 1200; // seconds
+const runWorkflowFor = 30; // seconds
 const BASE_URL = 'https://steamcommunity.com/market';
-const DELAY_MS = 10000;
-const DELAY_AFTER_TIMEOUT = 30000;
+const DELAY_MS = 5000;
+const DELAY_AFTER_TIMEOUT = 35000;
 const MAX_RETRIES = 5;
 const maxItemsProcessed = Math.trunc(runWorkflowFor / (DELAY_MS / 1000));
 
@@ -103,9 +103,10 @@ async function fetchAllNameIds() {
             }
 
             console.log(`Fetched ${currentItemName} ${start}/${maxAmount - 1}`);
-            await fs.writeFile(local_skins_to_name_id_path, JSON.stringify(skins, null, 2));
             await sleep(DELAY_MS);
         }
+
+        await fs.writeFile(local_skins_to_name_id_path, JSON.stringify(skins, null, 2));
     }
 }
 

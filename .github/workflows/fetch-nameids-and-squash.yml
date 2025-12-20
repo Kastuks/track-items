@@ -4,21 +4,29 @@ on:
   schedule:
     - cron: "30 0 * * 2,5,0" # "At 00:30 on Tuesday, Friday and Sunday."
   workflow_dispatch:       # allow manual run via GitHub UI
-      inputs:
-        commit_count:
-            description: 'Number of commits to squash'
-            required: true
-            default: '30'
+    inputs:
+      commit_count:
+        description: 'Number of commits to squash'
+        required: true
+        default: '30'
 
 permissions:
   contents: write
 
 jobs:
-  fetch:
+  fetch_and_squash:
     runs-on: ubuntu-latest
+
+    concurrency:
+      group: squash-commits
+      cancel-in-progress: false
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repo (full history)
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -33,47 +41,21 @@ jobs:
         env:
           BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
 
-      - name: Pull latest from master before pushing changes
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git pull origin master
-
-      - name: Commit and push results
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git pull https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
-          git add -A
-          git diff --cached --quiet || git commit -m "Update CS2 item prices [CI run]"
-          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
-
-  squash:
-    needs: fetch
-    runs-on: ubuntu-latest
-
-    concurrency:
-      group: squash-commits
-      cancel-in-progress: false
-
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.BOT_GITHUB_TOKEN }}  # or use GITHUB_TOKEN if you're not pushing from a bot
-
       - name: Configure Git
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-      - name: Fetch full history
-        run: git fetch --unshallow
-
-      - name: Squash commits
+      - name: Commit results locally
         run: |
-          COUNT=${{ github.event.inputs.commit_count }}
+          git add -A
+          git diff --cached --quiet || git commit -m "Update CS2 item prices [CI run]"
+
+      - name: Squash commits and push once
+        env:
+          COUNT: ${{ github.event.inputs.commit_count }}
+        run: |
           echo "Squashing last $COUNT commits..."
-          git reset --soft HEAD~$COUNT
+          git reset --soft "HEAD~$COUNT"
           git commit -m "Squash: Combine last $COUNT commits [Automated]"
-          git push origin HEAD --force
+          git push --force "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
