@@ -163,21 +163,23 @@ jobs:
             echo "Remote branch origin/${{ github.ref_name }} not found; skipping rebase"
           fi
 
-      - name: Push changes (retry on stale lease)
+      - name: Push changes (retry with fetch+rebase)
         env:
           MAX_PUSH_ATTEMPTS: 3
         run: |
           set -e
-          echo "Pushing changes with --force-with-lease to avoid overwriting remote updates unexpectedly"
+          echo "Ensure local branch tracks origin/${{ github.ref_name }}"
+          git branch --set-upstream-to=origin/${{ github.ref_name }} || true
+
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_PUSH_ATTEMPTS ]; do
             echo "Push attempt $ATTEMPT/$MAX_PUSH_ATTEMPTS"
-            if git push --force-with-lease "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"; then
+            if git push "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"; then
               echo "Push succeeded"
               exit 0
             fi
 
-            echo "Push rejected (possible concurrent update). Fetching remote and rebasing before retry..."
+            echo "Push failed; fetching remote and rebasing before retry..."
             git fetch origin "${{ github.ref_name }}" || true
             if git rev-parse --verify "origin/${{ github.ref_name }}" >/dev/null 2>&1; then
               git rebase "origin/${{ github.ref_name }}" || { echo "Rebase failed during retry; aborting."; git rebase --abort || true; exit 1; }
