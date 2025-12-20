@@ -49,7 +49,7 @@ jobs:
       - name: Commit results locally
         run: |
           git add -A
-          git diff --cached --quiet || git commit -m "Update CS2 item prices [CI run]"
+          git diff --cached --quiet || git commit -m "Update CS2 item name Id's [CI run]"
 
       - name: Fetch and rebase remote branch (if exists)
         run: |
