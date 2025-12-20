@@ -1,4 +1,4 @@
-name: Fetch CS2 missing Name IDs
+name: Fetch CS2 missing Name IDs and squash commits
 
 on:
   schedule:
@@ -51,11 +51,30 @@ jobs:
           git add -A
           git diff --cached --quiet || git commit -m "Update CS2 item prices [CI run]"
 
-      - name: Squash commits and push once
+      - name: Squash commits and push once (or push as-is when COUNT=0)
         env:
           COUNT: ${{ github.event.inputs.commit_count }}
         run: |
+          echo "Commit count requested: '$COUNT'"
+          if ! printf '%s' "$COUNT" | grep -Eq '^[0-9]+$'; then
+            echo "ERROR: commit_count must be a non-negative integer. Got: '$COUNT'"
+            exit 1
+          fi
+
+          if [ "$COUNT" = "0" ]; then
+            echo "No squash requested (COUNT=0). Pushing commits as-is..."
+            git push "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
+            exit 0
+          fi
+
+          TOTAL_COMMITS=$(git rev-list --count HEAD || true)
+          echo "Repository has $TOTAL_COMMITS commits. Requested squash of $COUNT commits."
+          if [ -z "$TOTAL_COMMITS" ] || [ "$TOTAL_COMMITS" -lt "$COUNT" ]; then
+            echo "ERROR: Not enough commits to squash ($TOTAL_COMMITS < $COUNT). Aborting."
+            exit 1
+          fi
+
           echo "Squashing last $COUNT commits..."
           git reset --soft "HEAD~$COUNT"
           git commit -m "Squash: Combine last $COUNT commits [Automated]"
-          git push --force "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
+          git push --force-with-lease "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
