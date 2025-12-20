@@ -5,6 +5,10 @@ on:
     - cron: "40 0 * * 3"    # at 00:40 on Wednesdays
   workflow_dispatch:       # allow manual run via GitHub UI
 
+concurrency:
+  group: repo-writer
+  cancel-in-progress: false
+
 permissions:
   contents: write
 

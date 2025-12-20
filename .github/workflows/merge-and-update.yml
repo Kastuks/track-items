@@ -10,6 +10,10 @@ permissions:
   actions: read
   id-token: write
 
+concurrency:
+  group: repo-writer
+  cancel-in-progress: false
+
 env:
   REPO: ${{ github.repository }}
   API_BASE: https://api.github.com
