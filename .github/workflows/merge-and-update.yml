@@ -142,11 +142,27 @@ jobs:
         run: |
           node merge-scraped-data.js scraped_parts
 
-      - name: Commit & push
+      - name: Commit results locally
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
           git add data/latest.json
-          git commit -m "Update data" || echo "No previous commit"
-          git push https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+          git diff --cached --quiet || git commit -m "Update data"
+
+      - name: Fetch and rebase remote branch (if exists)
+        run: |
+          echo "Configuring origin to use token for fetch/push"
+          git remote set-url origin "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          echo "Fetching remote branch ${GITHUB_REF_NAME:-${{ github.ref_name }}}"
+          git fetch origin "${{ github.ref_name }}" || true
+          if git rev-parse --verify "origin/${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "Rebasing local commits onto origin/${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}" || { echo "Rebase failed; aborting. Resolve conflicts manually or re-run workflow."; git rebase --abort || true; exit 1; }
+          else
+            echo "Remote branch origin/${{ github.ref_name }} not found; skipping rebase"
+          fi
+
+      - name: Push changes
+        run: |
+          echo "Pushing changes with --force-with-lease to avoid overwriting remote updates unexpectedly"
+          git push --force-with-lease "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
