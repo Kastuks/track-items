@@ -2,7 +2,7 @@ name: Fetch CS2 missing Name IDs and squash commits
 
 on:
   schedule:
-    - cron: "30 0 * * 2,5,0" # "At 00:30 on Tuesday, Friday and Sunday."
+    - cron: "20 0,2,4,6 * * 2,5,0" # "At 00:30 on Tuesday, Friday and Sunday."
   workflow_dispatch:       # allow manual run via GitHub UI
     inputs:
       commit_count:

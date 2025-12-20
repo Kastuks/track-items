@@ -24,6 +24,7 @@ async function fetchAdditionalItemInfo() {
       }
       await axios.get(url, options).then((response) => {
         const data = response.data;
+        console.log(`Total items found in remote: ${data.length}`);
         resolve(data);
       });
   });
