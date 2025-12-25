@@ -66,7 +66,7 @@ jobs:
 
       - name: Squash commits and push once (or push as-is when COUNT=0)
         env:
-          COUNT: ${{ github.event.inputs.commit_count }}
+          COUNT: ${{ github.event.inputs.commit_count || '30' }}
         run: |
           echo "Commit count requested: '$COUNT'"
           if ! printf '%s' "$COUNT" | grep -Eq '^[0-9]+$'; then
