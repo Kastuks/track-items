@@ -95,4 +95,4 @@ jobs:
           git commit -m "Squash: Combine last $COUNT commits [Automated]"
           git fetch origin "${{ github.ref_name }}"
           git rebase "origin/${{ github.ref_name }}"
-          git push --force-with-lease "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
+          git push --force "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
