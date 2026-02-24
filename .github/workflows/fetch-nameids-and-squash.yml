@@ -1,0 +1,94 @@
+name: Fetch CS2 missing Name IDs and squash commits
+
+on:
+  schedule:
+    - cron: "20 0,2,4,6 * * 2,5,0" # "At 00:30 on Tuesday, Friday and Sunday."
+  workflow_dispatch:       # allow manual run via GitHub UI
+    inputs:
+      commit_count:
+        description: 'Number of commits to squash'
+        required: true
+        default: '30'
+
+concurrency:
+  group: repo-writer
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch_and_squash:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo (full history)
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Fetch name ids
+        run: node getNameIds.js
+        env:
+          BOT_GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+      - name: Commit results locally
+        run: |
+          git add -A
+          git diff --cached --quiet || git commit -m "Update CS2 item name Id's [CI run]"
+
+      - name: Fetch and rebase remote branch (if exists)
+        run: |
+          echo "Configuring origin to use token for fetch/push"
+          git remote set-url origin "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          echo "Fetching remote branch ${GITHUB_REF_NAME:-${{ github.ref_name }}}"
+          git fetch origin "${{ github.ref_name }}" || true
+          git fetch --tags origin || true
+          if git rev-parse --verify "origin/${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "Rebasing local commits onto origin/${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}" || { echo "Rebase failed; aborting. Resolve conflicts manually or re-run workflow."; git rebase --abort || true; exit 1; }
+          else
+            echo "Remote branch origin/${{ github.ref_name }} not found; skipping rebase"
+          fi
+
+      - name: Squash commits and push once (or push as-is when COUNT=0)
+        env:
+          COUNT: ${{ github.event.inputs.commit_count || '30' }}
+        run: |
+          echo "Commit count requested: '$COUNT'"
+          if ! printf '%s' "$COUNT" | grep -Eq '^[0-9]+$'; then
+            echo "ERROR: commit_count must be a non-negative integer. Got: '$COUNT'"
+            exit 1
+          fi
+
+          if [ "$COUNT" = "0" ]; then
+            echo "No squash requested (COUNT=0). Pushing commits as-is..."
+            git push "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"
+            exit 0
+          fi
+
+          TOTAL_COMMITS=$(git rev-list --count HEAD || true)
+          echo "Repository has $TOTAL_COMMITS commits. Requested squash of $COUNT commits."
+          if [ -z "$TOTAL_COMMITS" ] || [ "$TOTAL_COMMITS" -lt "$COUNT" ]; then
+            echo "ERROR: Not enough commits to squash ($TOTAL_COMMITS < $COUNT). Aborting."
+            exit 1
+          fi
+
+          echo "Squashing last $COUNT commits..."
+          git reset --soft "HEAD~$COUNT"
+          git commit -m "Squash: Combine last $COUNT commits [Automated]"
+          git push --force "https://x-access-token:${{ secrets.BOT_GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"

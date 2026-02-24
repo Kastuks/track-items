@@ -10,7 +10,7 @@ const local_skins_to_name_id_path = "backup/cs2_skins_to_name_id.json";
 const runWorkflowFor = 1200; // seconds
 const BASE_URL = 'https://steamcommunity.com/market';
 const DELAY_MS = 10000;
-const DELAY_AFTER_TIMEOUT = 30000;
+const DELAY_AFTER_TIMEOUT = 35000;
 const MAX_RETRIES = 5;
 const maxItemsProcessed = Math.trunc(runWorkflowFor / (DELAY_MS / 1000));
 
@@ -24,6 +24,7 @@ async function fetchAdditionalItemInfo() {
       }
       await axios.get(url, options).then((response) => {
         const data = response.data;
+        console.log(`Total items found in remote: ${data.length}`);
         resolve(data);
       });
   });
@@ -50,7 +51,8 @@ async function retry(fn, retries = MAX_RETRIES) {
       delay *= 2; // Exponential backoff
     }
   }
-  throw new Error('Max retries reached.');
+  console.warn('Max retries reached. Returning null to allow caller to continue.');
+  return null;
 }
 
 async function fetchAllNameIds() {
@@ -103,9 +105,10 @@ async function fetchAllNameIds() {
             }
 
             console.log(`Fetched ${currentItemName} ${start}/${maxAmount - 1}`);
-            await fs.writeFile(local_skins_to_name_id_path, JSON.stringify(skins, null, 2));
             await sleep(DELAY_MS);
         }
+
+        await fs.writeFile(local_skins_to_name_id_path, JSON.stringify(skins, null, 2));
     }
 }
 
@@ -114,11 +117,18 @@ async function fetchItemNameId(currentItemName, appId = 730) {
 
     try {
         const axiosInstance = getAxiosInstance();
-        const { data: html } = await retry(() => axiosInstance.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            }
-        }));
+    const response = await retry(() => axiosInstance.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      }
+    }));
+
+    if (!response) {
+      console.warn(`Max retries reached for item ${currentItemName}; skipping fetch.`);
+      return null;
+    }
+
+    const { data: html } = response;
         const match = html.match(/Market_LoadOrderSpread\(( \d+ )\)/);
 
         if (match) {

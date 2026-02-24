@@ -110,16 +110,21 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
   const count = 1;
   let maxAmount = Infinity;
 
-  if (fsSync.existsSync(savePath)) {
-    try {
-      const existing = JSON.parse(await fs.readFile(savePath, 'utf8'));
-      items = existing;
-      itemsMap = Object.fromEntries(existing.map(item => [item.hash_name, item]));
-      start = await loadStartFrom();
-      currentBatchStart = start;
-    } catch {
-      items = [];
-    }
+  // if (fsSync.existsSync(savePath)) {
+  //   try {
+  //     const existing = JSON.parse(await fs.readFile(savePath, 'utf8'));
+  //     items = existing;
+  //     itemsMap = Object.fromEntries(existing.map(item => [item.hash_name, item]));
+  //     start = await loadStartFrom();
+  //     currentBatchStart = start;
+  //   } catch {
+  //     items = [];
+  //   }
+  // }
+
+  if (itemListFromRender && itemListFromRender.length != 0) {
+    start = await loadStartFrom();
+    currentBatchStart = start;
   }
 
   if (batchNum) {
@@ -194,7 +199,6 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
       }
 
       console.log(`Fetched ${currentItemName} ${currentBatchStart}/${maxAmount}`);
-      await fs.writeFile(savePath, JSON.stringify(Object.values(itemsMap), null, 2));
       await sleep(DELAY_MS);
     } catch (err) {
       console.error(`Error fetching items at start=${start}: ${err.message}`);
@@ -202,7 +206,8 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
     }
   }
   
-  return itemsMap;
+  await fs.writeFile(savePath, JSON.stringify(Object.values(itemsMap), null, 2));
+  return Object.values(itemsMap).map(item => item.hash_name);
 }
 
 async function fetchPriceInfo(itemName) {
@@ -258,6 +263,7 @@ async function main() {
   getUsdToEurConversionRate();
   const items = await fetchAllItemPrices();
 
+  console.log('All items: ', items);
   console.log(`Done! Saved ${items.length} items to ${outputPath}`);
 }
 
