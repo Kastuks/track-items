@@ -1,0 +1,11 @@
+Abort current merge and reset local branch to github origin:
+    git merge --abort
+    git fetch origin
+    git reset --hard origin/<branch>
+
+
+Drop changes in files I modified (not staged):
+    git restore .
+
+Drop everything (all changes + staged files)
+    git reset --hard

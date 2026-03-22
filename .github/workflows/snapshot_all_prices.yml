@@ -2,7 +2,7 @@ name: Snapshot prices
 
 on:
   schedule:
-    - cron: "40 0 * * 3"    # at 00:40 on Wednesdays
+    - cron: "40 0 * * 4"    # at 00:40 on Thursdays
   workflow_dispatch:       # allow manual run via GitHub UI
 
 concurrency:
