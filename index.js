@@ -32,6 +32,10 @@ async function fetchAdditionalItemInfo() {
       await axios.get(url, options).then((response) => {
         const data = response.data;
         resolve(data);
+      }).catch((err) => {
+        console.error(`Error fetching additional item info: ${err.message}`); 
+        console.log('got error');
+        reject(err);
       });
   });
 }
@@ -41,12 +45,13 @@ async function fetchSkinsToNameIds(fetchLocal = false) {
       if (fetchLocal && existsSync(local_skins_to_name_id_path)) {
         const data = JSON.parse(await fs.readFile(local_skins_to_name_id_path, 'utf8'));
         resolve(data);
+      } else {
+        const url = skins_to_name_id;
+        await axios.get(url).then((response) => {
+          const data = response.data;
+          resolve(data);
+        });
       }
-      const url = skins_to_name_id;
-      await axios.get(url).then((response) => {
-        const data = response.data;
-        resolve(data);
-      });
   });
 }
 
@@ -101,7 +106,7 @@ async function retry(fn, retries = MAX_RETRIES) {
 async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_items_${batchNum}.json` : outputPath) {
   const itemListFromRender = await fetchAdditionalItemInfo();
   const hashNameToNameId = await fetchSkinsToNameIds(true);
-
+  
   let currentBatchStart = 0;
   let currentBatchMaximum = itemListFromRender.length;
   let items = [];
