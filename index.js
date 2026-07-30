@@ -20,6 +20,16 @@ const maxItemsProcessed = Math.trunc(runWorkflowFor / (DELAY_MS / 1000));
 const batchNum = process.env.BATCH_NUM || 1;
 const batchSize = 8;
 let usdToEurConversion = 0.9;
+const headers = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/javascript, */*; q=0.01',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Referer': 'https://steamcommunity.com/market/listings/730/AK-47%20%7C%20Redline%20%28Field-Tested%29', // must match the item you're querying
+  'X-Requested-With': 'XMLHttpRequest', // Steam's own JS sends this on the histogram XHR
+  'Sec-Fetch-Site': 'same-origin',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Dest': 'empty',
+};
 
 async function fetchAdditionalItemInfo() {
   return new Promise(async (resolve, reject) => {
@@ -179,7 +189,7 @@ async function fetchAllItemPrices(savePath = batchNum ? `data/cs2_prices/cs2_ite
 
       const url = `${BASE_URL}/itemordershistogram?norender=1&country=NL&language=english&currency=3&item_nameid=${itemNameId}&two_factor=0`;
       const axiosInstance = getAxiosInstance();
-      const { data } = await retry(() => axiosInstance.get(url), 2);
+      const { data } = await retry(() => axiosInstance.get(url, {headers}), 2);
     
       if (itemsMap[currentItemName]) {
         itemsMap[currentItemName] = {
